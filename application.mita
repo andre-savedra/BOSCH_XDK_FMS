@@ -1,0 +1,78 @@
+/**
+ * Welcome to Eclipse Mita.
+ *
+ * Not sure what to do now?
+ * Check out the "Getting started" guide on https://mita.io.
+ */
+
+package main;
+import platforms.xdk110;
+
+// resource for accelerometer
+setup accelerometer {
+	bandwidth = BW_500Hz;
+	range = Range_8G;
+}
+
+// resource for gyroscope
+setup Gyroscope_BMI160 {
+	bandwidth = BW_10_7Hz;
+	range = Range_250s;
+}
+
+// resource for light sensor
+setup light {
+	manual_mode = false;
+}
+
+// resource for environment sensor
+setup environment {
+	power_mode = Normal;
+	standby_time = 1000;
+	temperature_oversampling = OVERSAMPLE_1X;
+}
+
+// resource for WiFi connectivity
+setup wifi : WLAN {
+	ssid = 'MY_SSID';	
+	authentication = Personal(psk = 'MYPASS');	
+}
+
+// resource for Qubitro MQTT Broker
+setup qubitroBroker : MQTT {
+	transport = wifi;
+	cleanSession = true;
+	url = 'mqtt:MY_BROKER';
+	clientId = 'CLIENT_ID';
+	authentication = Login('CLIENT_ID', 'CLIENT_PASS');
+	var qubitroTopik = topic('CLIENT_ID', 0);
+}
+
+// create event: every 5 sec read sensors & send to Qubitro
+every 10 seconds {
+	
+	// read sensors
+	var accx = accelerometer.x_axis.read();
+	var accy = accelerometer.y_axis.read();
+	var accz = accelerometer.z_axis.read();
+	var gyx = gyroscope.x_axis.read();
+	var gyy = gyroscope.y_axis.read();
+	var gyz = gyroscope.z_axis.read();
+	var light = light.intensity.read() / 1000.0;
+	var temperature = environment.temperature.read() / 1000.0;
+	temperature = temperature - 6.5975;
+	var humidity = environment.humidity.read() / 1000.0;
+	var pressure = environment.pressure.read() / 1000.0;
+	
+	// create JSON string 
+	var json = `{
+		"accx": ${accx}, "accy": ${accy}, "accz": ${accz},
+		"gyx": ${gyx}, "gyy": ${gyy}, "gyz": ${gyz},
+		"light": ${light}, "temperature": ${temperature},
+		"humidity": ${humidity}, "pressure": ${pressure}
+	}`;
+	
+	// publish data to qubitro
+	qubitroBroker.qubitroTopik.write(json);
+	println(json);
+}
